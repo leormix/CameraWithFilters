@@ -5,6 +5,9 @@ from datetime import datetime
 import os
 from filters_window import filters_func
 
+face_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+
+
 # Папка для сохранения
 SAVE_DIR = "../CameraWithFilters"
 os.makedirs(SAVE_DIR, exist_ok=True)
@@ -25,9 +28,17 @@ root.geometry("1300x800")
 video_label = tk.Label(root, bg="black")
 video_label.pack(fill=tk.BOTH, expand=True)
 
-# === Функции ===
+# Face detection
+def detect_bounding_box(vid):
+    gray_image = cv2.cvtColor(vid, cv2.COLOR_BGR2GRAY)
+    faces = face_classifier.detectMultiScale(gray_image, 1.1, 5, minSize=(40, 40))
+    for (x, y, w, h) in faces:
+        cv2.rectangle(vid, (x, y), (x + w, y + h), (0, 255, 0), 4)
+    return faces
+
+# Filter 
 def apply_filter(img):
-    """Применяет фильтр к кадру"""
+
     if current_filter == "gray":
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
@@ -41,10 +52,11 @@ def apply_filter(img):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         img = cv2.Canny(img, 15, 15)
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    elif current_filter == 'facetrack':
+        faces = detect_bounding_box(img)
     return img
 
 def update_frame():
-    """Обновление изображения в окне"""
     global last_display_frame, recording, recordedVideo
     if running and cap and cap.isOpened():
         ret, img = cap.read()
@@ -53,11 +65,11 @@ def update_frame():
             img = apply_filter(img)
             last_display_frame = img.copy()
 
-            # Если запись включена — пишем кадр в оригинальном размере
+
             if recording and recordedVideo:
                 recordedVideo.write(img)
 
-            # Масштабирование для отображения
+
             win_w = video_label.winfo_width()
             win_h = video_label.winfo_height()
             target_w = win_w
@@ -76,11 +88,9 @@ def update_frame():
         root.after(10, update_frame)
 
 def start():
-    """Запуск камеры"""
     global cap, running
     if not running:
         cap = cv2.VideoCapture(0)
-        # Максимальное качество (обычно 1920x1080, можно поставить больше если камера поддерживает)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
         cap.set(cv2.CAP_PROP_FPS, frameRate)
@@ -88,7 +98,6 @@ def start():
         update_frame()
 
 def stop():
-    """Остановка камеры"""
     global cap, running, recording, recordedVideo
     running = False
     if cap:
@@ -98,8 +107,8 @@ def stop():
         toggle_record()  # выключаем запись при остановке
     video_label.config(image='')  # очистка экрана
 
+# Took photo
 def screenshot():
-    """Сохранить фото"""
     global last_display_frame
     if last_display_frame is not None:
         current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -107,12 +116,12 @@ def screenshot():
         cv2.imwrite(path, last_display_frame)
 
 def change_filter(new_filter):
-    """Сменить фильтр"""
     global current_filter
     current_filter = new_filter
 
+# Video record
+
 def toggle_record():
-    """Включить/выключить запись видео"""
     global recording, recordedVideo
     if not recording:
         if last_display_frame is None:
@@ -131,7 +140,7 @@ def toggle_record():
             recordedVideo = None
         btn_video.config(text="Video Rec", bg="grey")
 
-# === Кнопки ===
+# Buttons
 btn_frame = tk.Frame(root)
 btn_frame.pack(fill=tk.X)
 
